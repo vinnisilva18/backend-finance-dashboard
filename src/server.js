@@ -31,7 +31,8 @@ const allowedOrigins = [
   'http://localhost:3000',
   'https://finance-dashboard-rich.vercel.app',
   'https://finance-dashboard-frontend.vercel.app',
-  'https://finance-dashboard-backend-ashy.vercel.app'
+  'https://finance-dashboard-backend-ashy.vercel.app',
+  'https://finance-dashboard-adjtzrjc7-vinicius-silvas-projects.vercel.app'
 ];
 
 // Add Vercel URLs dynamically
