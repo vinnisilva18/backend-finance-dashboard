@@ -2,9 +2,19 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/finance_dashboard';
-    
+    // For Vercel deployment, require MONGODB_URI
+    let mongoURI;
+    if (process.env.VERCEL) {
+      mongoURI = process.env.MONGODB_URI;
+      if (!mongoURI) {
+        throw new Error('MONGODB_URI environment variable is required for Vercel deployment');
+      }
+    } else {
+      mongoURI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/finance_dashboard';
+    }
+
     console.log('Attempting to connect to MongoDB...');
+    console.log('Environment:', process.env.VERCEL ? 'Vercel' : 'Local');
     console.log('MongoDB URI:', mongoURI.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@')); // Hide credentials
     
     const conn = await mongoose.connect(mongoURI, {
