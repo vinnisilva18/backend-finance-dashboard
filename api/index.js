@@ -1,4 +1,4 @@
-// Vercel serverless function - handles all API routes
+// index.js - Vercel serverless function
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -26,74 +26,126 @@ const notificationRoutes = require('../src/routes/notificationRoutes');
 // Initialize express app
 const app = express();
 
-// Check for essential environment variables
-if (!process.env.JWT_SECRET) {
-  console.warn('⚠️  WARNING: JWT_SECRET is not defined. Authentication will likely fail.');
-} else {
-  console.log(`✅ JWT_SECRET loaded (length: ${process.env.JWT_SECRET.length})`);
-}
+// ✅ CRÍTICO: Log das variáveis de ambiente (para debug no Vercel)
+console.log('🔍 Environment Check:', {
+  NODE_ENV: process.env.NODE_ENV,
+  JWT_SECRET: process.env.JWT_SECRET ? '***SET***' : '❌ MISSING',
+  MONGODB_URI: process.env.MONGODB_URI ? '***SET***' : '❌ MISSING',
+  VERCEL_URL: process.env.VERCEL_URL || 'Not set'
+});
 
-// Connect to database
-connectDB();
-
-// CORS configuration
-const allowedOrigins = [
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'http://127.0.0.1:5173',
-  'http://127.0.0.1:3000',
-  'https://finance-dashboard-rich.vercel.app',
-  'https://finance-dashboard-frontend.vercel.app',
-  'https://finance-dashboard-backend-ashy.vercel.app',
-  'https://finance-dashboard-adjtzrjc7-vinicius-silvas-projects.vercel.app'
-];
-
-if (process.env.VERCEL_URL) {
-  allowedOrigins.push(`https://${process.env.VERCEL_URL}`);
-}
-
+// ✅ IMPROVED CORS Configuration
 const corsOptions = {
   origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    if (origin.includes('localhost') || origin.includes('127.0.0.1')) return callback(null, true);
-    if (origin.includes('vercel.app')) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    
+    // Allow all localhost origins
+    if (/localhost:\d+$/.test(origin) || /127\.0\.0\.1:\d+$/.test(origin)) {
       return callback(null, true);
     }
-    if (process.env.NODE_ENV === 'production') {
-      console.log('Blocked origin:', origin);
-      return callback(new Error('Not allowed by CORS'), false);
+    
+    // Allow all vercel.app subdomains
+    if (origin.endsWith('.vercel.app')) {
+      return callback(null, true);
     }
-    return callback(null, true);
+    
+    // Specific allowed origins
+    const allowedOrigins = [
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'https://finance-dashboard-rich.vercel.app',
+      'https://finance-dashboard-frontend.vercel.app',
+      'https://finance-dashboard-backend-ashy.vercel.app',
+    ];
+    
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    
+    console.log('🔒 CORS blocked origin:', origin);
+    callback(new Error(`Origin ${origin} not allowed by CORS`));
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
   allowedHeaders: [
     'Content-Type',
     'Authorization',
     'Accept',
+    'Origin',
     'X-Requested-With',
+    'X-Auth-Token',
+    'Access-Control-Allow-Origin',
+    'Access-Control-Allow-Headers',
     'Access-Control-Request-Method',
     'Access-Control-Request-Headers'
   ],
-  optionsSuccessStatus: 200
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 86400, // 24 hours
+  optionsSuccessStatus: 200,
+  preflightContinue: false
 };
 
-// Middleware
-app.use(cors(corsOptions));
-app.use(helmet());
-app.use(morgan('combined'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+// ✅ CRITICAL: Handle OPTIONS requests (pre-flight) FIRST
+app.options('*', cors(corsOptions));
 
-// Request logging
+// ✅ Middleware in correct order
+app.use(cors(corsOptions));
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+}));
+
+app.use(morgan('combined'));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: false, limit: '50mb' }));
+
+// ✅ Request logging with more details
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.path} - IP: ${req.ip}`);
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`, {
+    origin: req.get('origin'),
+    userAgent: req.get('user-agent'),
+    contentType: req.get('content-type'),
+    authorization: req.get('authorization') ? 'present' : 'missing'
+  });
   next();
 });
 
-// Routes
-console.log('Setting up API routes...');
+// ✅ Connect to database with better error handling
+const connectDBWithRetry = async () => {
+  try {
+    await connectDB();
+    console.log('✅ MongoDB connected successfully');
+  } catch (error) {
+    console.error('❌ MongoDB connection error:', error.message);
+    // Don't crash the app, just log error
+  }
+};
+
+// Connect immediately (Vercel may reuse containers)
+connectDBWithRetry();
+
+// ✅ Routes
+console.log('🚀 Setting up API routes...');
+
+// Add a simple test route first
+app.get('/api/test-simple', (req, res) => {
+  res.json({ 
+    message: 'API is working!',
+    timestamp: new Date().toISOString(),
+    method: req.method,
+    path: req.path
+  });
+});
+
+// Register routes
 app.use('/api/auth', authRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/categories', categoryRoutes);
@@ -103,10 +155,11 @@ app.use('/api/currencies', currencyRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/email', emailRoutes);
 app.use('/api/notifications', notificationRoutes);
-console.log('API routes configured successfully');
 
-// Health check route
-app.get('/api/health', (req, res) => {
+console.log('✅ API routes configured successfully');
+
+// ✅ Health check with database status
+app.get('/api/health', async (req, res) => {
   const dbStatus = mongoose.connection.readyState;
   const statusMap = {
     0: 'disconnected',
@@ -114,69 +167,120 @@ app.get('/api/health', (req, res) => {
     2: 'connecting',
     3: 'disconnecting'
   };
+  
   res.json({
     status: 'OK',
     message: 'Finance Dashboard API is running',
     database: statusMap[dbStatus] || 'unknown',
+    dbStatus,
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    uptime: process.uptime()
+  });
+});
+
+// ✅ Test route for POST requests
+app.post('/api/test-post', (req, res) => {
+  console.log('Test POST route called:', {
+    method: req.method,
+    url: req.url,
+    body: req.body,
+    headers: req.headers
+  });
+  res.json({
+    message: 'POST request received!',
+    yourData: req.body,
     timestamp: new Date().toISOString()
   });
 });
 
-// Test route
-app.get('/api/test', (req, res) => {
-  console.log('Test route called:', {
-    method: req.method,
-    url: req.url,
-    headers: req.headers,
-    timestamp: new Date().toISOString()
+// ✅ 404 handler for API routes
+app.use('/api/*', (req, res) => {
+  console.log('404 - Route not found:', req.method, req.originalUrl);
+  res.status(404).json({ 
+    message: 'API endpoint not found',
+    requestedPath: req.originalUrl,
+    availableEndpoints: [
+      '/api/auth/*',
+      '/api/transactions/*',
+      '/api/categories/*',
+      '/api/cards/*',
+      '/api/goals/*',
+      '/api/currencies/*',
+      '/api/user/*',
+      '/api/email/*',
+      '/api/notifications/*',
+      '/api/health',
+      '/api/test',
+      '/api/test-simple',
+      '/api/test-post'
+    ]
   });
+});
+
+// ✅ Root route
+app.get('/', (req, res) => {
   res.json({
-    message: 'Backend is working!',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
+    message: 'Finance Dashboard API',
+    documentation: 'Check /api/health for API status',
+    endpoints: '/api/*',
     version: '1.0.0'
   });
 });
 
-// 404 handler
-app.use('/api/*', (req, res) => {
-  res.status(404).json({ message: 'API endpoint not found' });
-});
-
-// Error handling middleware
+// ✅ Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Error occurred:', {
+  console.error('🔥 Error occurred:', {
     message: err.message,
     stack: err.stack,
     url: req.url,
     method: req.method,
-    ip: req.ip,
-    userAgent: req.get('User-Agent'),
+    origin: req.get('origin'),
     timestamp: new Date().toISOString()
   });
 
-  if (err.name === 'UnauthorizedError') {
-    return res.status(401).json({
-      success: false,
-      message: 'Invalid token'
-    });
-  }
-
+  // CORS error
   if (err.message && err.message.includes('CORS')) {
     return res.status(403).json({
       success: false,
-      message: 'CORS policy violation',
-      error: process.env.NODE_ENV === 'development' ? err.message : 'Forbidden'
+      message: 'CORS error',
+      details: process.env.NODE_ENV === 'development' ? err.message : 'Forbidden',
+      allowedOrigins: [
+        'http://localhost:5173',
+        'http://localhost:3000',
+        'https://finance-dashboard-rich.vercel.app'
+      ]
     });
   }
 
-  res.status(500).json({
+  // JWT/auth error
+  if (err.name === 'UnauthorizedError' || err.name === 'JsonWebTokenError') {
+    return res.status(401).json({
+      success: false,
+      message: 'Authentication failed',
+      error: 'Invalid or missing token'
+    });
+  }
+
+  // Default error
+  res.status(err.status || 500).json({
     success: false,
-    message: 'Something went wrong!',
-    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error',
+    message: 'Internal server error',
+    error: process.env.NODE_ENV === 'development' ? err.message : undefined,
     timestamp: new Date().toISOString()
   });
 });
 
-// Vercel serverless function export
+// ✅ Vercel serverless function export - CRITICAL FOR VERCEL
+// O Vercel precisa deste export específico
 module.exports = app;
+
+// ✅ Para desenvolvimento local
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📡 Health check: http://localhost:${PORT}/api/health`);
+    console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
+  });
+}
