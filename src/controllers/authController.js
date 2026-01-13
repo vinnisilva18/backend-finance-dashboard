@@ -152,9 +152,30 @@ const updateProfile = async (req, res) => {
   }
 };
 
+// @desc    Verify token
+// @route   GET /api/auth/verify
+// @access  Private
+const verifyToken = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    res.json({
+      valid: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email
+      }
+    });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
+  }
+};
+
 module.exports = {
   register,
   login,
   getMe,
-  updateProfile
+  updateProfile,
+  verifyToken
 };

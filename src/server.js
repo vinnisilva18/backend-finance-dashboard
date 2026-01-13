@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const dotenv = require('dotenv');
+const mongoose = require('mongoose');
 
 // Load environment variables
 dotenv.config();
@@ -18,9 +19,18 @@ const cardRoutes = require('./routes/cardRoutes');
 const goalRoutes = require('./routes/goalRoutes');
 const currencyRoutes = require('./routes/currencyRoutes');
 const userRoutes = require('./routes/userRoutes');
+const emailRoutes = require('./routes/emailRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 
 // Initialize express app
 const app = express();
+
+// Check for essential environment variables
+if (!process.env.JWT_SECRET) {
+  console.warn('⚠️  WARNING: JWT_SECRET is not defined in .env file. Authentication will likely fail.');
+} else {
+  console.log(`✅ JWT_SECRET loaded (length: ${process.env.JWT_SECRET.length})`);
+}
 
 // Connect to database
 connectDB();
@@ -29,6 +39,8 @@ connectDB();
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:3000',
   'https://finance-dashboard-rich.vercel.app',
   'https://finance-dashboard-frontend.vercel.app',
   'https://finance-dashboard-backend-ashy.vercel.app',
@@ -46,7 +58,7 @@ const corsOptions = {
     if (!origin) return callback(null, true);
 
     // Allow all localhost origins for development
-    if (origin.includes('localhost')) return callback(null, true);
+    if (origin.includes('localhost') || origin.includes('127.0.0.1')) return callback(null, true);
 
     // Allow Vercel preview deployments
     if (origin.includes('vercel.app')) return callback(null, true);
@@ -91,6 +103,19 @@ app.use((req, res, next) => {
   next();
 });
 
+// Debug middleware for Authorization
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/') && !req.path.includes('/auth/') && !req.path.includes('/health')) {
+    if (!req.headers.authorization) {
+      console.warn(`⚠️  [Auth Check] Missing Authorization header for: ${req.method} ${req.path}`);
+    } else {
+      const token = req.headers.authorization.split(' ')[1];
+      console.log(`ℹ️  [Auth Check] Token received for ${req.path}: ${token ? token.substring(0, 15) + '...' : 'Invalid format'}`);
+    }
+  }
+  next();
+});
+
 // Handle preflight requests
 app.options('*', cors(corsOptions));
 
@@ -119,13 +144,23 @@ app.use('/api/cards', cardRoutes);
 app.use('/api/goals', goalRoutes);
 app.use('/api/currencies', currencyRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/email', emailRoutes);
+app.use('/api/notifications', notificationRoutes);
 console.log('API routes configured successfully');
 
 // Health check route
 app.get('/api/health', (req, res) => {
+  const dbStatus = mongoose.connection.readyState;
+  const statusMap = {
+    0: 'disconnected',
+    1: 'connected',
+    2: 'connecting',
+    3: 'disconnecting'
+  };
   res.json({ 
     status: 'OK', 
     message: 'Finance Dashboard API is running',
+    database: statusMap[dbStatus] || 'unknown',
     timestamp: new Date().toISOString()
   });
 });

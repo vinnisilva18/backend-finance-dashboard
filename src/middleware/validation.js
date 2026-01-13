@@ -20,7 +20,15 @@ const validateRequest = (validations) => {
 
 // Common validation rules
 const transactionValidation = [
-    body('amount').isFloat({ min: 0 }).withMessage('Amount must be a positive number'),
+    body('amount').isFloat().withMessage('Amount must be a valid number').custom((value, { req }) => {
+        if (req.body.type === 'expense' && value > 0) {
+            throw new Error('Expense amount should be negative');
+        }
+        if (req.body.type === 'income' && value < 0) {
+            throw new Error('Income amount should be positive');
+        }
+        return true;
+    }),
     body('description').trim().isLength({ min: 1, max: 200 }).withMessage('Description must be between 1 and 200 characters'),
     body('date').isISO8601().withMessage('Invalid date format'),
     body('type').isIn(['income', 'expense']).withMessage('Type must be either income or expense'),

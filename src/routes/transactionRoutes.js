@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const { validateRequest, transactionValidation } = require('../middleware/validation');
 const transactionController = require('../controllers/transactionController');
 
 // @route   GET /api/transactions
@@ -16,7 +17,7 @@ router.get('/:id', auth, transactionController.getTransaction);
 // @route   POST /api/transactions
 // @desc    Create transaction
 // @access  Private
-router.post('/', auth, transactionController.createTransaction);
+router.post('/', auth, validateRequest(transactionValidation), transactionController.createTransaction);
 
 // @route   PUT /api/transactions/:id
 // @desc    Update transaction

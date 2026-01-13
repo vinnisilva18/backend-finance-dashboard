@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const { validateRequest, categoryValidation } = require('../middleware/validation');
 const categoryController = require('../controllers/categoryController');
 
 // @route   GET /api/categories
@@ -16,7 +17,7 @@ router.get('/:id', auth, categoryController.getCategory);
 // @route   POST /api/categories
 // @desc    Create category
 // @access  Private
-router.post('/', auth, categoryController.createCategory);
+router.post('/', auth, validateRequest(categoryValidation), categoryController.createCategory);
 
 // @route   PUT /api/categories/:id
 // @desc    Update category
@@ -26,6 +27,11 @@ router.put('/:id', auth, categoryController.updateCategory);
 // @route   DELETE /api/categories/:id
 // @desc    Delete category
 // @access  Private
-router.delete('/:id', auth, categoryController.deleteCategory);
+router.delete('/:id', auth, (req, res, next) => {
+  if (req.params.id === 'undefined' || !req.params.id) {
+    return res.status(400).json({ message: 'Invalid category ID' });
+  }
+  next();
+}, categoryController.deleteCategory);
 
 module.exports = router;
