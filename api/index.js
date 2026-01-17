@@ -34,23 +34,13 @@ console.log('🔍 Environment Check:', {
   VERCEL_URL: process.env.VERCEL_URL || 'Not set'
 });
 
-// ✅ IMPROVED CORS Configuration
+// ✅ IMPROVED CORS Configuration for cross-domain frontend/backend
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
-    // Allow all localhost origins
-    if (/localhost:\d+$/.test(origin) || /127\.0\.0\.1:\d+$/.test(origin)) {
-      return callback(null, true);
-    }
-    
-    // Allow all vercel.app subdomains
-    if (origin.endsWith('.vercel.app')) {
-      return callback(null, true);
-    }
-    
-    // Specific allowed origins
+
+    // Lista de origens permitidas
     const allowedOrigins = [
       'http://localhost:5173',
       'http://localhost:3000',
@@ -58,32 +48,34 @@ const corsOptions = {
       'https://finance-dashboard-frontend.vercel.app',
       'https://finance-dashboard-backend-ashy.vercel.app',
     ];
-    
-    if (allowedOrigins.includes(origin)) {
+
+    // Verifica se a origem está na lista ou é um subdomínio vercel
+    if (
+      allowedOrigins.includes(origin) ||
+      origin.endsWith('.vercel.app') ||
+      origin.includes('localhost') ||
+      origin.includes('127.0.0.1')
+    ) {
       return callback(null, true);
     }
-    
-    console.log('🔒 CORS blocked origin:', origin);
-    callback(new Error(`Origin ${origin} not allowed by CORS`));
+
+    console.log('🚫 CORS blocked origin:', origin);
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
     'Content-Type',
     'Authorization',
+    'X-Requested-With',
     'Accept',
     'Origin',
-    'X-Requested-With',
-    'X-Auth-Token',
-    'Access-Control-Allow-Origin',
-    'Access-Control-Allow-Headers',
     'Access-Control-Request-Method',
     'Access-Control-Request-Headers'
   ],
   exposedHeaders: ['Content-Range', 'X-Content-Range'],
   maxAge: 86400, // 24 hours
-  optionsSuccessStatus: 200,
-  preflightContinue: false
+  optionsSuccessStatus: 204
 };
 
 // ✅ CRITICAL: Handle OPTIONS requests (pre-flight) FIRST
