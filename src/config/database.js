@@ -10,6 +10,23 @@ const connectDB = async () => {
       mongoURI = 'mongodb://127.0.0.1:27017/finance_dashboard';
     }
 
+    // Fix for MongoDB password with special characters
+    // If the URI contains unescaped special characters in password, encode them
+    if (mongoURI && mongoURI.includes('mongodb+srv://') && mongoURI.includes('@')) {
+      const match = mongoURI.match(/mongodb\+srv:\/\/([^:]+):([^@]+)@/);
+      if (match) {
+        const username = match[1];
+        const password = match[2];
+        // Check if password contains unescaped characters
+        if (password.match(/[#@\$%\^&\*\(\)\+\[\]\{\}\|\\:;"'<>,\.\?\/~`]/)) {
+          console.log('🔧 Detected unescaped characters in MongoDB password, encoding...');
+          const encodedPassword = encodeURIComponent(password);
+          mongoURI = mongoURI.replace(`${username}:${password}@`, `${username}:${encodedPassword}@`);
+          console.log('✅ Password encoded successfully');
+        }
+      }
+    }
+
     console.log('Attempting to connect to MongoDB...');
     console.log('Environment:', process.env.VERCEL ? 'Vercel' : 'Local');
     console.log('MongoDB URI:', mongoURI.replace(/\/\/([^:]+):([^@]+)@/, '//***:***@')); // Hide credentials
