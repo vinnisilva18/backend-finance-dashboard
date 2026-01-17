@@ -136,8 +136,8 @@ connectDBWithRetry();
 console.log('🚀 Setting up API routes...');
 
 // Add a simple test route first
-app.get('/test-simple', (req, res) => {
-  res.json({ 
+app.get('/api/test-simple', (req, res) => {
+  res.json({
     message: 'API is working!',
     timestamp: new Date().toISOString(),
     method: req.method,
@@ -146,20 +146,20 @@ app.get('/test-simple', (req, res) => {
 });
 
 // Register routes
-app.use('/auth', authRoutes);
-app.use('/transactions', transactionRoutes);
-app.use('/categories', categoryRoutes);
-app.use('/cards', cardRoutes);
-app.use('/goals', goalRoutes);
-app.use('/currencies', currencyRoutes);
-app.use('/user', userRoutes);
-app.use('/email', emailRoutes);
-app.use('/notifications', notificationRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/transactions', transactionRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/cards', cardRoutes);
+app.use('/api/goals', goalRoutes);
+app.use('/api/currencies', currencyRoutes);
+app.use('/api/user', userRoutes);
+app.use('/api/email', emailRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 console.log('✅ API routes configured successfully');
 
 // ✅ Health check with database status
-app.get('/health', async (req, res) => {
+app.get('/api/health', async (req, res) => {
   const dbStatus = mongoose.connection.readyState;
   const statusMap = {
     0: 'disconnected',
@@ -167,7 +167,7 @@ app.get('/health', async (req, res) => {
     2: 'connecting',
     3: 'disconnecting'
   };
-  
+
   res.json({
     status: 'OK',
     message: 'Finance Dashboard API is running',
@@ -197,23 +197,23 @@ app.post('/test-post', (req, res) => {
 // ✅ 404 handler for API routes
 app.use((req, res) => {
   console.log('404 - Route not found:', req.method, req.originalUrl);
-  res.status(404).json({ 
+  res.status(404).json({
     message: 'API endpoint not found',
     requestedPath: req.originalUrl,
     availableEndpoints: [
-      '/auth/*',
-      '/transactions/*',
-      '/categories/*',
-      '/cards/*',
-      '/goals/*',
-      '/currencies/*',
-      '/user/*',
-      '/email/*',
-      '/notifications/*',
-      '/health',
-      '/test',
-      '/test-simple',
-      '/test-post'
+      '/api/auth/*',
+      '/api/transactions/*',
+      '/api/categories/*',
+      '/api/cards/*',
+      '/api/goals/*',
+      '/api/currencies/*',
+      '/api/user/*',
+      '/api/email/*',
+      '/api/notifications/*',
+      '/api/health',
+      '/api/test',
+      '/api/test-simple',
+      '/api/test-post'
     ]
   });
 });
