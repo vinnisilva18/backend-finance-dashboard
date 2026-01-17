@@ -136,7 +136,7 @@ connectDBWithRetry();
 console.log('🚀 Setting up API routes...');
 
 // Add a simple test route first
-app.get('/api/test-simple', (req, res) => {
+app.get('/test-simple', (req, res) => {
   res.json({ 
     message: 'API is working!',
     timestamp: new Date().toISOString(),
@@ -146,20 +146,20 @@ app.get('/api/test-simple', (req, res) => {
 });
 
 // Register routes
-app.use('/api/auth', authRoutes);
-app.use('/api/transactions', transactionRoutes);
-app.use('/api/categories', categoryRoutes);
-app.use('/api/cards', cardRoutes);
-app.use('/api/goals', goalRoutes);
-app.use('/api/currencies', currencyRoutes);
-app.use('/api/user', userRoutes);
-app.use('/api/email', emailRoutes);
-app.use('/api/notifications', notificationRoutes);
+app.use('/auth', authRoutes);
+app.use('/transactions', transactionRoutes);
+app.use('/categories', categoryRoutes);
+app.use('/cards', cardRoutes);
+app.use('/goals', goalRoutes);
+app.use('/currencies', currencyRoutes);
+app.use('/user', userRoutes);
+app.use('/email', emailRoutes);
+app.use('/notifications', notificationRoutes);
 
 console.log('✅ API routes configured successfully');
 
 // ✅ Health check with database status
-app.get('/api/health', async (req, res) => {
+app.get('/health', async (req, res) => {
   const dbStatus = mongoose.connection.readyState;
   const statusMap = {
     0: 'disconnected',
@@ -180,7 +180,7 @@ app.get('/api/health', async (req, res) => {
 });
 
 // ✅ Test route for POST requests
-app.post('/api/test-post', (req, res) => {
+app.post('/test-post', (req, res) => {
   console.log('Test POST route called:', {
     method: req.method,
     url: req.url,
@@ -195,25 +195,25 @@ app.post('/api/test-post', (req, res) => {
 });
 
 // ✅ 404 handler for API routes
-app.use('/api/*', (req, res) => {
+app.use((req, res) => {
   console.log('404 - Route not found:', req.method, req.originalUrl);
   res.status(404).json({ 
     message: 'API endpoint not found',
     requestedPath: req.originalUrl,
     availableEndpoints: [
-      '/api/auth/*',
-      '/api/transactions/*',
-      '/api/categories/*',
-      '/api/cards/*',
-      '/api/goals/*',
-      '/api/currencies/*',
-      '/api/user/*',
-      '/api/email/*',
-      '/api/notifications/*',
-      '/api/health',
-      '/api/test',
-      '/api/test-simple',
-      '/api/test-post'
+      '/auth/*',
+      '/transactions/*',
+      '/categories/*',
+      '/cards/*',
+      '/goals/*',
+      '/currencies/*',
+      '/user/*',
+      '/email/*',
+      '/notifications/*',
+      '/health',
+      '/test',
+      '/test-simple',
+      '/test-post'
     ]
   });
 });
@@ -222,8 +222,8 @@ app.use('/api/*', (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     message: 'Finance Dashboard API',
-    documentation: 'Check /api/health for API status',
-    endpoints: '/api/*',
+    documentation: 'Check /health for API status',
+    endpoints: '/*',
     version: '1.0.0'
   });
 });
