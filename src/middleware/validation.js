@@ -32,7 +32,7 @@ const transactionValidation = [
     body('description').trim().isLength({ min: 1, max: 200 }).withMessage('Description must be between 1 and 200 characters'),
     body('date').isISO8601().withMessage('Invalid date format'),
     body('type').isIn(['income', 'expense']).withMessage('Type must be either income or expense'),
-    body('category').notEmpty().withMessage('Category is required').isString().trim().isLength({ min: 1 }).withMessage('Category name must be at least 1 character')
+    body('category').optional().isString().trim().isLength({ min: 1 }).withMessage('Category name must be at least 1 character')
 ];
 
 const userValidation = [
