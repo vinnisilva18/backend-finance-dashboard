@@ -87,23 +87,40 @@ const createTransaction = async (req, res) => {
       notes
     } = req.body;
 
-    // Find category by name if provided
+    // Find or create category by name if provided
     let categoryId = null;
     
     // Only process category if it's provided and valid
     if (category && typeof category === 'string' && category !== 'undefined' && category.trim() !== '') {
       const Category = require('../models/Category');
-      const categoryDoc = await Category.findOne({
+      let categoryDoc = await Category.findOne({
         name: category.trim(),
         user: req.user.id
       });
 
+      // Se a categoria não existe, criar automaticamente
       if (!categoryDoc) {
-        return res.status(400).json({
-          success: false,
-          message: `Category "${category}" not found. Please create the category first.`
+        console.log(`Criando categoria automaticamente: ${category}`);
+        
+        // Definir cores padrão baseadas no tipo
+        const defaultColors = {
+          income: '#4CAF50',  // Verde para receitas
+          expense: '#F44336'  // Vermelho para despesas
+        };
+        
+        categoryDoc = new Category({
+          user: req.user.id,
+          name: category.trim(),
+          type: type,
+          color: defaultColors[type] || '#4CAF50',
+          icone: 'category',
+          icon: 'category'
         });
+        
+        await categoryDoc.save();
+        console.log(`Categoria criada com sucesso: ${categoryDoc._id}`);
       }
+      
       categoryId = categoryDoc._id;
     }
 
@@ -121,7 +138,7 @@ const createTransaction = async (req, res) => {
     await transaction.save();
 
     // Populate references
-    await transaction.populate('category', 'name color');
+    await transaction.populate('category', 'name color icone');
     await transaction.populate('card', 'name type');
 
     res.status(201).json(transaction);

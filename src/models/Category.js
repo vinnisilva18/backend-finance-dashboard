@@ -20,9 +20,13 @@ const categorySchema = new mongoose.Schema({
     type: String,
     default: '#4CAF50'
   },
-  icon: {
+  icone: {
     type: String,
     default: 'category'
+  },
+  // Manter icon para compatibilidade com dados antigos
+  icon: {
+    type: String
   },
   image: {
     type: String, // Base64 encoded image or URL

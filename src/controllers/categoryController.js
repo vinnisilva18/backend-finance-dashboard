@@ -48,7 +48,7 @@ const getCategory = async (req, res) => {
 // @access  Private
 const createCategory = async (req, res) => {
   try {
-    const { name, type, color, icon, budget } = req.body;
+    const { name, type, color, icon, icone, budget } = req.body;
     
     // Check if category already exists for this user
     const existingCategory = await Category.findOne({
@@ -60,12 +60,16 @@ const createCategory = async (req, res) => {
       return res.status(400).json({ message: 'Category already exists' });
     }
     
+    // Suportar tanto 'icon' quanto 'icone'
+    const iconValue = icone || icon || 'category';
+    
     const category = new Category({
       user: req.user.id,
       name,
       type,
       color,
-      icon,
+      icone: iconValue,
+      icon: iconValue, // Manter compatibilidade
       budget
     });
     
@@ -83,7 +87,7 @@ const createCategory = async (req, res) => {
 // @access  Private
 const updateCategory = async (req, res) => {
   try {
-    const { name, type, color, icon, budget } = req.body;
+    const { name, type, color, icon, icone, budget } = req.body;
     
     let category = await Category.findOne({
       _id: req.params.id,
@@ -111,7 +115,14 @@ const updateCategory = async (req, res) => {
     if (name !== undefined) category.name = name;
     if (type !== undefined) category.type = type;
     if (color !== undefined) category.color = color;
-    if (icon !== undefined) category.icon = icon;
+    
+    // Suportar tanto 'icon' quanto 'icone'
+    const iconValue = icone || icon;
+    if (iconValue !== undefined) {
+      category.icone = iconValue;
+      category.icon = iconValue; // Manter compatibilidade
+    }
+    
     if (budget !== undefined) category.budget = budget;
     
     await category.save();
