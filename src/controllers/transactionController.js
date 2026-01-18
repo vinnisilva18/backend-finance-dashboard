@@ -19,7 +19,17 @@ const getTransactions = async (req, res) => {
     
     // Category filter
     if (category) {
-      query.category = category;
+      const Category = require('../models/Category');
+      const categoryDoc = await Category.findOne({
+        name: category,
+        user: req.user.id
+      });
+      if (categoryDoc) {
+        query.category = categoryDoc._id;
+      } else {
+        // If category not found, return empty array
+        return res.json([]);
+      }
     }
     
     // Type filter
@@ -114,31 +124,49 @@ const updateTransaction = async (req, res) => {
       card,
       notes
     } = req.body;
-    
+
     let transaction = await Transaction.findOne({
       _id: req.params.id,
       user: req.user.id
     });
-    
+
     if (!transaction) {
       return res.status(404).json({ message: 'Transaction not found' });
     }
-    
+
+    // If category is provided, find it by name
+    let categoryId = transaction.category;
+    if (category !== undefined) {
+      const Category = require('../models/Category');
+      const categoryDoc = await Category.findOne({
+        name: category,
+        user: req.user.id
+      });
+
+      if (!categoryDoc) {
+        return res.status(400).json({
+          success: false,
+          message: `Category "${category}" not found. Please create the category first.`
+        });
+      }
+      categoryId = categoryDoc._id;
+    }
+
     // Update fields
     if (amount !== undefined) transaction.amount = amount;
     if (description !== undefined) transaction.description = description;
     if (type !== undefined) transaction.type = type;
-    if (category !== undefined) transaction.category = category;
+    if (category !== undefined) transaction.category = categoryId;
     if (date !== undefined) transaction.date = date;
     if (card !== undefined) transaction.card = card;
     if (notes !== undefined) transaction.notes = notes;
-    
+
     await transaction.save();
-    
+
     // Populate references
     await transaction.populate('category', 'name color');
     await transaction.populate('card', 'name type');
-    
+
     res.json(transaction);
   } catch (err) {
     console.error(err.message);
