@@ -12,11 +12,11 @@ const connectDB = async () => {
 
     // Fix for MongoDB password with special characters
     // If the URI contains unescaped special characters in password, encode them
-    if (mongoURI && mongoURI.includes('mongodb+srv://') && mongoURI.includes('@')) {
-      const match = mongoURI.match(/mongodb\+srv:\/\/([^:]+):([^@]+)@/);
+    if (mongoURI && (mongoURI.includes('mongodb://') || mongoURI.includes('mongodb+srv://')) && mongoURI.includes('@')) {
+      const match = mongoURI.match(/(mongodb(?:\+srv)?):\/\/([^:]+):([^@]+)@/);
       if (match) {
-        const username = match[1];
-        const password = match[2];
+        const username = match[2];
+        const password = match[3];
         // Check if password contains unescaped characters
         if (password.match(/[#@\$%\^&\*\(\)\+\[\]\{\}\|\\:;"'<>,\.\?\/~`]/)) {
           console.log('🔧 Detected unescaped characters in MongoDB password, encoding...');
