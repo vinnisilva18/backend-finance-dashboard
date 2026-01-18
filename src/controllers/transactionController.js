@@ -85,24 +85,38 @@ const createTransaction = async (req, res) => {
       card,
       notes
     } = req.body;
-    
+
+    // Find category by name
+    const Category = require('../models/Category');
+    const categoryDoc = await Category.findOne({
+      name: category,
+      user: req.user.id
+    });
+
+    if (!categoryDoc) {
+      return res.status(400).json({
+        success: false,
+        message: `Category "${category}" not found. Please create the category first.`
+      });
+    }
+
     const transaction = new Transaction({
       user: req.user.id,
       amount,
       description,
       type,
-      category,
+      category: categoryDoc._id, // Use the ObjectId
       date: date || Date.now(),
       card,
       notes
     });
-    
+
     await transaction.save();
-    
+
     // Populate references
     await transaction.populate('category', 'name color');
     await transaction.populate('card', 'name type');
-    
+
     res.status(201).json(transaction);
   } catch (err) {
     console.error(err.message);
