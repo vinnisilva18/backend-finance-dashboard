@@ -1,4 +1,5 @@
 const Transaction = require('../models/Transaction');
+const mongoose = require('mongoose');
 
 // @desc    Get all transactions
 // @route   GET /api/transactions
@@ -226,7 +227,7 @@ const getTransactionStats = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
     
-    let matchQuery = { user: req.user.id };
+    let matchQuery = { user: new mongoose.Types.ObjectId(req.user.id) };
     
     if (startDate && endDate) {
       matchQuery.date = {
