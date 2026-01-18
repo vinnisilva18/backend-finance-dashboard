@@ -27,7 +27,14 @@ router.put('/:id', auth, transactionController.updateTransaction);
 // @route   DELETE /api/transactions/:id
 // @desc    Delete transaction
 // @access  Private
-router.delete('/:id', auth, transactionController.deleteTransaction);
+router.delete('/:id', auth, (req, res, next) => {
+  if (req.params.id === 'undefined' || !req.params.id || req.params.id === 'null') {
+    return res.status(400).json({ 
+      message: 'Invalid transaction ID. The frontend is sending "undefined" as the transaction ID. Please check the frontend code to ensure it is passing the correct transaction ID.' 
+    });
+  }
+  next();
+}, transactionController.deleteTransaction);
 
 // @route   GET /api/transactions/stats/summary
 // @desc    Get transaction statistics
