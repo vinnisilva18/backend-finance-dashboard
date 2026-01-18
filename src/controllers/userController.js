@@ -1,4 +1,9 @@
 const User = require('../models/User');
+const Transaction = require('../models/Transaction');
+const Category = require('../models/Category');
+const Goal = require('../models/Goal');
+const Card = require('../models/Card');
+const mongoose = require('mongoose');
 
 // @desc    Get user preferences
 // @route   GET /api/user/preferences
@@ -46,21 +51,107 @@ const updatePreferences = async (req, res) => {
 // @access  Private
 const getUserStats = async (req, res) => {
   try {
-    // In a real app, you would aggregate data from multiple collections
-    // For now, return mock data
+    const userId = new mongoose.Types.ObjectId(req.user.id);
+    
+    // Get total transactions count
+    const totalTransactions = await Transaction.countDocuments({ user: userId });
+    
+    // Calculate income, expenses and savings
+    const transactionStats = await Transaction.aggregate([
+      { $match: { user: userId } },
+      {
+        $group: {
+          _id: null,
+          totalIncome: {
+            $sum: {
+              $cond: [{ $eq: ['$type', 'income'] }, '$amount', 0]
+            }
+          },
+          totalExpenses: {
+            $sum: {
+              $cond: [{ $eq: ['$type', 'expense'] }, { $abs: '$amount' }, 0]
+            }
+          }
+        }
+      }
+    ]);
+    
+    const totalIncome = transactionStats[0]?.totalIncome || 0;
+    const totalExpenses = transactionStats[0]?.totalExpenses || 0;
+    const totalSavings = totalIncome - totalExpenses;
+    
+    // Calculate monthly averages (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    
+    const monthlyStats = await Transaction.aggregate([
+      { 
+        $match: { 
+          user: userId,
+          date: { $gte: thirtyDaysAgo }
+        } 
+      },
+      {
+        $group: {
+          _id: null,
+          monthlyIncome: {
+            $sum: {
+              $cond: [{ $eq: ['$type', 'income'] }, '$amount', 0]
+            }
+          },
+          monthlyExpenses: {
+            $sum: {
+              $cond: [{ $eq: ['$type', 'expense'] }, { $abs: '$amount' }, 0]
+            }
+          }
+        }
+      }
+    ]);
+    
+    const monthlyIncome = monthlyStats[0]?.monthlyIncome || 0;
+    const monthlyExpenses = monthlyStats[0]?.monthlyExpenses || 0;
+    const monthlySavings = monthlyIncome - monthlyExpenses;
+    
+    // Get total categories
+    const totalCategories = await Category.countDocuments({ user: userId });
+    
+    // Get active goals (not completed)
+    const activeGoals = await Goal.countDocuments({ 
+      user: userId,
+      isCompleted: false
+    });
+    
+    // Get total goals for achievement rate
+    const totalGoals = await Goal.countDocuments({ user: userId });
+    const completedGoals = await Goal.countDocuments({ 
+      user: userId,
+      isCompleted: true
+    });
+    
+    // Calculate achievement rate
+    const achievementRate = totalGoals > 0 
+      ? Math.round((completedGoals / totalGoals) * 100) 
+      : 0;
+    
+    // Get credit cards count
+    const creditCards = await Card.countDocuments({ user: userId });
     
     const stats = {
-      totalTransactions: 156,
-      totalCategories: 12,
-      activeGoals: 4,
-      creditCards: 2,
-      totalSavings: 23000,
+      totalTransactions,
+      totalCategories,
+      activeGoals,
+      creditCards,
+      totalSavings: Math.round(totalSavings * 100) / 100,
+      totalIncome: Math.round(totalIncome * 100) / 100,
+      totalExpenses: Math.round(totalExpenses * 100) / 100,
       monthlyAverage: {
-        income: 5200,
-        expenses: 3800,
-        savings: 1400
+        income: Math.round(monthlyIncome * 100) / 100,
+        expenses: Math.round(monthlyExpenses * 100) / 100,
+        savings: Math.round(monthlySavings * 100) / 100
       },
-      achievementRate: 78
+      achievementRate,
+      completedGoals,
+      totalGoals
     };
     
     res.json(stats);
