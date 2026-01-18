@@ -22,6 +22,18 @@ const userRoutes = require('./routes/userRoutes');
 const emailRoutes = require('./routes/emailRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 
+// Adicione isso logo após os imports das rotas
+console.log('🔍 Verificando rotas importadas...');
+console.log('authRoutes:', authRoutes ? '✓ Importado' : '✗ FALTOU');
+console.log('transactionRoutes:', transactionRoutes ? '✓ Importado' : '✗ FALTOU');
+console.log('categoryRoutes:', categoryRoutes ? '✓ Importado' : '✗ FALTOU');
+console.log('cardRoutes:', cardRoutes ? '✓ Importado' : '✗ FALTOU');
+console.log('goalRoutes:', goalRoutes ? '✓ Importado' : '✗ FALTOU');
+console.log('currencyRoutes:', currencyRoutes ? '✓ Importado' : '✗ FALTOU');
+console.log('userRoutes:', userRoutes ? '✓ Importado' : '✗ FALTOU');
+console.log('emailRoutes:', emailRoutes ? '✓ Importado' : '✗ FALTOU');
+console.log('notificationRoutes:', notificationRoutes ? '✓ Importado' : '✗ FALTOU');
+
 // Initialize express app
 const app = express();
 
@@ -135,18 +147,55 @@ app.get('/api/test', (req, res) => {
   });
 });
 
-// Routes
-console.log('Setting up API routes...');
-app.use('/api/auth', authRoutes);
-app.use('/api/transactions', transactionRoutes);
-app.use('/api/categories', categoryRoutes);
-app.use('/api/cards', cardRoutes);
-app.use('/api/goals', goalRoutes);
-app.use('/api/currencies', currencyRoutes);
-app.use('/api/user', userRoutes);
-app.use('/api/email', emailRoutes);
-app.use('/api/notifications', notificationRoutes);
-console.log('API routes configured successfully');
+// Routes with detailed logging
+console.log('🔧 Setting up API routes...');
+
+app.use('/api/auth', (req, res, next) => {
+  console.log(`📥 Auth route called: ${req.method} ${req.originalUrl}`);
+  next();
+}, authRoutes);
+
+app.use('/api/transactions', (req, res, next) => {
+  console.log(`📥 Transactions route called: ${req.method} ${req.originalUrl}`);
+  next();
+}, transactionRoutes);
+
+app.use('/api/categories', (req, res, next) => {
+  console.log(`📥 Categories route called: ${req.method} ${req.originalUrl}`);
+  next();
+}, categoryRoutes);
+
+app.use('/api/cards', (req, res, next) => {
+  console.log(`📥 Cards route called: ${req.method} ${req.originalUrl}`);
+  next();
+}, cardRoutes);
+
+app.use('/api/goals', (req, res, next) => {
+  console.log(`📥 Goals route called: ${req.method} ${req.originalUrl}`);
+  next();
+}, goalRoutes);
+
+app.use('/api/currencies', (req, res, next) => {
+  console.log(`📥 Currencies route called: ${req.method} ${req.originalUrl}`);
+  next();
+}, currencyRoutes);
+
+app.use('/api/user', (req, res, next) => {
+  console.log(`📥 User route called: ${req.method} ${req.originalUrl}`);
+  next();
+}, userRoutes);
+
+app.use('/api/email', (req, res, next) => {
+  console.log(`📥 Email route called: ${req.method} ${req.originalUrl}`);
+  next();
+}, emailRoutes);
+
+app.use('/api/notifications', (req, res, next) => {
+  console.log(`📥 Notifications route called: ${req.method} ${req.originalUrl}`);
+  next();
+}, notificationRoutes);
+
+console.log('✅ API routes configured successfully');
 
 // Health check route
 app.get('/api/health', (req, res) => {
@@ -175,6 +224,42 @@ app.post('/api/test-post', (req, res) => {
   res.json({
     message: 'POST test works!',
     received: req.body
+  });
+});
+
+// Debug route para verificar todas as rotas registradas
+app.get('/api/debug-routes', (req, res) => {
+  const routes = [];
+
+  // Função para extrair rotas
+  function printRoutes(layer, prefix = '') {
+    if (layer.route) {
+      const path = prefix + layer.route.path;
+      const methods = Object.keys(layer.route.methods).map(m => m.toUpperCase()).join(', ');
+      routes.push({ path, methods });
+    } else if (layer.name === 'router' && layer.handle.stack) {
+      const routerPrefix = layer.regexp.toString()
+        .replace('/^', '')
+        .replace('\\/?(?=\\/|$)/i', '')
+        .replace(/\\\//g, '/')
+        .replace(/\/\^/g, '')
+        .replace(/\$\/i/g, '')
+        .replace(/\?/g, '')
+        .replace(/\(\?=\\\/\|\$\)/g, '');
+
+      layer.handle.stack.forEach(sublayer => {
+        printRoutes(sublayer, routerPrefix);
+      });
+    }
+  }
+
+  app._router.stack.forEach(layer => {
+    printRoutes(layer);
+  });
+
+  res.json({
+    totalRoutes: routes.length,
+    routes: routes
   });
 });
 
