@@ -1,16 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const notificationController = require('../controllers/notificationController');
 const auth = require('../middleware/auth');
+const notificationController = require('../controllers/notificationController');
 
-// All routes require authentication
-router.use(auth);
-
-router.get('/', notificationController.getNotifications);
-router.get('/stats', notificationController.getNotificationStats);
-router.put('/:id/read', notificationController.markAsRead);
-router.put('/read-all', notificationController.markAllAsRead);
-router.delete('/:id', notificationController.deleteNotification);
-router.delete('/', notificationController.clearAllNotifications);
+router.get('/', auth, notificationController.getNotifications);
+router.put('/:id/read', auth, notificationController.markAsRead);
+router.put('/read-all', auth, notificationController.markAllAsRead);
+router.delete('/:id', auth, notificationController.deleteNotification);
+router.delete('/', auth, notificationController.clearAllNotifications);
+router.get('/stats', auth, notificationController.getNotificationStats);
+router.post('/', auth, notificationController.createSystemNotification);
+router.post('/process-scheduled', auth, notificationController.processScheduledNotifications);
+router.post('/send-email', auth, notificationController.sendEmailNotifications);
 
 module.exports = router;

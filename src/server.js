@@ -157,17 +157,53 @@ app.get('/api/health', (req, res) => {
     2: 'connecting',
     3: 'disconnecting'
   };
-  res.json({ 
-    status: 'OK', 
+  res.json({
+    status: 'OK',
     message: 'Finance Dashboard API is running',
     database: statusMap[dbStatus] || 'unknown',
     timestamp: new Date().toISOString()
   });
 });
 
-// 404 handler
+// Test route (simples)
+app.get('/api/test-simple', (req, res) => {
+  res.json({ message: 'Simple test works!' });
+});
+
+// Test POST route
+app.post('/api/test-post', (req, res) => {
+  res.json({
+    message: 'POST test works!',
+    received: req.body
+  });
+});
+
+// 404 handler - DEVE SER A ÚLTIMA ROTA
 app.use('/api/*', (req, res) => {
-  res.status(404).json({ message: 'API endpoint not found' });
+  const availableEndpoints = [
+    '/api/auth/*',
+    '/api/transactions/*',
+    '/api/categories/*',
+    '/api/cards/*',
+    '/api/goals/*',
+    '/api/currencies/*',
+    '/api/user/*',
+    '/api/email/*',
+    '/api/notifications/*',
+    '/api/health',
+    '/api/test',
+    '/api/test-simple',
+    '/api/test-post'
+  ];
+
+  console.log(`⚠️  API endpoint not found: ${req.method} ${req.originalUrl}`);
+
+  res.status(404).json({
+    message: 'API endpoint not found',
+    requestedPath: req.path,
+    method: req.method,
+    availableEndpoints: availableEndpoints
+  });
 });
 
 // Error handling middleware
