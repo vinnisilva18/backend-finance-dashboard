@@ -86,18 +86,24 @@ const createTransaction = async (req, res) => {
       notes
     } = req.body;
 
-    // Find category by name
-    const Category = require('../models/Category');
-    const categoryDoc = await Category.findOne({
-      name: category,
-      user: req.user.id
-    });
-
-    if (!categoryDoc) {
-      return res.status(400).json({
-        success: false,
-        message: `Category "${category}" not found. Please create the category first.`
+    // Find category by name if provided
+    let categoryId = null;
+    
+    // Only process category if it's provided and valid
+    if (category && typeof category === 'string' && category !== 'undefined' && category.trim() !== '') {
+      const Category = require('../models/Category');
+      const categoryDoc = await Category.findOne({
+        name: category.trim(),
+        user: req.user.id
       });
+
+      if (!categoryDoc) {
+        return res.status(400).json({
+          success: false,
+          message: `Category "${category}" not found. Please create the category first.`
+        });
+      }
+      categoryId = categoryDoc._id;
     }
 
     const transaction = new Transaction({
@@ -105,7 +111,7 @@ const createTransaction = async (req, res) => {
       amount,
       description,
       type,
-      category: categoryDoc._id, // Use the ObjectId
+      category: categoryId, // Use the ObjectId or null
       date: date || Date.now(),
       card,
       notes
@@ -150,10 +156,10 @@ const updateTransaction = async (req, res) => {
 
     // If category is provided, find it by name
     let categoryId = transaction.category;
-    if (category !== undefined) {
+    if (category && typeof category === 'string' && category !== 'undefined' && category.trim() !== '') {
       const Category = require('../models/Category');
       const categoryDoc = await Category.findOne({
-        name: category,
+        name: category.trim(),
         user: req.user.id
       });
 
@@ -164,6 +170,8 @@ const updateTransaction = async (req, res) => {
         });
       }
       categoryId = categoryDoc._id;
+    } else if (category === 'undefined' || category === '' || !category) {
+      categoryId = null;
     }
 
     // Update fields
