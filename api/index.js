@@ -186,6 +186,16 @@ app.post('/test-post', (req, res) => {
   });
 });
 
+// ✅ Root route
+app.get('/', (req, res) => {
+  res.json({
+    message: 'Finance Dashboard API',
+    documentation: 'Check /health for API status',
+    endpoints: '/*',
+    version: '1.0.0'
+  });
+});
+
 // ✅ 404 handler for API routes
 app.use((req, res) => {
   console.log('404 - Route not found:', req.method, req.originalUrl);
@@ -207,16 +217,6 @@ app.use((req, res) => {
       '/api/test-simple',
       '/api/test-post'
     ]
-  });
-});
-
-// ✅ Root route
-app.get('/', (req, res) => {
-  res.json({
-    message: 'Finance Dashboard API',
-    documentation: 'Check /health for API status',
-    endpoints: '/*',
-    version: '1.0.0'
   });
 });
 
