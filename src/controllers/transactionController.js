@@ -22,7 +22,7 @@ const getTransactions = async (req, res) => {
     if (category) {
       const Category = require('../models/Category');
       const categoryDoc = await Category.findOne({
-        name: category,
+        name: { $regex: `^${category}$`, $options: 'i' },
         user: req.user.id
       });
       if (categoryDoc) {
@@ -93,14 +93,15 @@ const createTransaction = async (req, res) => {
     // Only process category if it's provided and valid
     if (category && typeof category === 'string' && category !== 'undefined' && category.trim() !== '') {
       const Category = require('../models/Category');
+      const categoryName = category.trim();
       let categoryDoc = await Category.findOne({
-        name: category.trim(),
+        name: { $regex: `^${categoryName}$`, $options: 'i' },
         user: req.user.id
       });
 
       // Se a categoria não existe, criar automaticamente
       if (!categoryDoc) {
-        console.log(`Criando categoria automaticamente: ${category}`);
+        console.log(`Criando categoria automaticamente: ${categoryName}`);
         
         // Definir cores padrão baseadas no tipo
         const defaultColors = {
@@ -110,7 +111,7 @@ const createTransaction = async (req, res) => {
         
         categoryDoc = new Category({
           user: req.user.id,
-          name: category.trim(),
+          name: categoryName,
           type: type,
           color: defaultColors[type] || '#4CAF50',
           icone: 'category',
@@ -176,15 +177,16 @@ const updateTransaction = async (req, res) => {
     let categoryId = transaction.category;
     if (category && typeof category === 'string' && category !== 'undefined' && category.trim() !== '') {
       const Category = require('../models/Category');
+      const categoryName = category.trim();
       const categoryDoc = await Category.findOne({
-        name: category.trim(),
+        name: { $regex: `^${categoryName}$`, $options: 'i' },
         user: req.user.id
       });
 
       if (!categoryDoc) {
         return res.status(400).json({
           success: false,
-          message: `Category "${category}" not found. Please create the category first.`
+          message: `Category "${categoryName}" not found. Please create the category first.`
         });
       }
       categoryId = categoryDoc._id;
