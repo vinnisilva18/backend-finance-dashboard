@@ -87,42 +87,53 @@ const createTransaction = async (req, res) => {
       notes
     } = req.body;
 
-    // Find or create category by name if provided
     let categoryId = null;
     
-    // Only process category if it's provided and valid
     if (category && typeof category === 'string' && category !== 'undefined' && category.trim() !== '') {
+      const categoryValue = category.trim();
       const Category = require('../models/Category');
-      const categoryName = category.trim();
-      let categoryDoc = await Category.findOne({
-        name: { $regex: `^${categoryName}$`, $options: 'i' },
-        user: req.user.id
-      });
 
-      // Se a categoria não existe, criar automaticamente
-      if (!categoryDoc) {
-        console.log(`Criando categoria automaticamente: ${categoryName}`);
-        
-        // Definir cores padrão baseadas no tipo
-        const defaultColors = {
-          income: '#4CAF50',  // Verde para receitas
-          expense: '#F44336'  // Vermelho para despesas
-        };
-        
-        categoryDoc = new Category({
-          user: req.user.id,
-          name: categoryName,
-          type: type,
-          color: defaultColors[type] || '#4CAF50',
-          icone: 'category',
-          icon: 'category'
+      if (mongoose.Types.ObjectId.isValid(categoryValue)) {
+        // The value is a valid ObjectId format. Treat it as an ID.
+        const categoryDoc = await Category.findOne({ _id: categoryValue, user: req.user.id });
+        if (categoryDoc) {
+          categoryId = categoryDoc._id;
+        } else {
+          // It's a valid format, but no such category exists for this user.
+          return res.status(400).json({ message: `A categoria com o ID "${categoryValue}" não foi encontrada.` });
+        }
+      } else {
+        // The value is NOT an ObjectId. Treat it as a name.
+        const categoryName = categoryValue;
+        let categoryDoc = await Category.findOne({
+          name: { $regex: `^${categoryName}$`, $options: 'i' },
+          user: req.user.id
         });
+
+        // If the category doesn't exist by name, create it.
+        if (!categoryDoc) {
+          console.log(`Criando categoria automaticamente: ${categoryName}`);
+          
+          const defaultColors = {
+            income: '#4CAF50',
+            expense: '#F44336'
+          };
+          
+          categoryDoc = new Category({
+            user: req.user.id,
+            name: categoryName,
+            type: type,
+            color: defaultColors[type] || '#4CAF50',
+            icone: 'category',
+            icon: 'category'
+          });
+          
+          await categoryDoc.save();
+          console.log(`Categoria criada com sucesso: ${categoryDoc._id}`);
+        }
         
-        await categoryDoc.save();
-        console.log(`Categoria criada com sucesso: ${categoryDoc._id}`);
+        categoryId = categoryDoc._id;
       }
-      
-      categoryId = categoryDoc._id;
     }
 
     const transaction = new Transaction({
@@ -173,35 +184,39 @@ const updateTransaction = async (req, res) => {
       return res.status(404).json({ message: 'Transaction not found' });
     }
 
-    // If category is provided, find it by name
-    let categoryId = transaction.category;
-    if (category && typeof category === 'string' && category !== 'undefined' && category.trim() !== '') {
-      const Category = require('../models/Category');
-      const categoryName = category.trim();
-      const categoryDoc = await Category.findOne({
-        name: { $regex: `^${categoryName}$`, $options: 'i' },
-        user: req.user.id
-      });
-
-      if (!categoryDoc) {
-        return res.status(400).json({
-          success: false,
-          message: `Category "${categoryName}" not found. Please create the category first.`
-        });
-      }
-      categoryId = categoryDoc._id;
-    } else if (category === 'undefined' || category === '' || !category) {
-      categoryId = null;
-    }
-
     // Update fields
     if (amount !== undefined) transaction.amount = amount;
     if (description !== undefined) transaction.description = description;
     if (type !== undefined) transaction.type = type;
-    if (category !== undefined) transaction.category = categoryId;
     if (date !== undefined) transaction.date = date;
     if (card !== undefined) transaction.card = card;
     if (notes !== undefined) transaction.notes = notes;
+
+    // Handle category update separately to avoid ambiguity between ID and name
+    if (category !== undefined) {
+      let categoryId = null; // Default to null if category is empty/invalid
+      if (category && typeof category === 'string' && category.trim() !== '') {
+        const categoryValue = category.trim();
+        const Category = require('../models/Category');
+
+        if (mongoose.Types.ObjectId.isValid(categoryValue)) {
+          // It's an ID
+          const categoryDoc = await Category.findOne({ _id: categoryValue, user: req.user.id });
+          if (!categoryDoc) {
+            return res.status(400).json({ message: `A categoria com o ID "${categoryValue}" não foi encontrada.` });
+          }
+          categoryId = categoryDoc._id;
+        } else {
+          // It's a name
+          const categoryDoc = await Category.findOne({ name: { $regex: `^${categoryValue}$`, $options: 'i' }, user: req.user.id });
+          if (!categoryDoc) {
+            return res.status(400).json({ message: `A categoria com o nome "${categoryValue}" não foi encontrada.` });
+          }
+          categoryId = categoryDoc._id;
+        }
+      }
+      transaction.category = categoryId; // Set to the new ID or null
+    }
 
     await transaction.save();
 
