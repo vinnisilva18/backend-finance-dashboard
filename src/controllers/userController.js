@@ -51,6 +51,7 @@ const updatePreferences = async (req, res) => {
 // @access  Private
 const getUserStats = async (req, res) => {
   try {
+    console.log(`[STATS] Iniciando cálculo de estatísticas para o usuário: ${req.user.id}`);
     const userId = new mongoose.Types.ObjectId(req.user.id);
     
     // Get total transactions count
@@ -114,6 +115,7 @@ const getUserStats = async (req, res) => {
     
     // Get total categories
     const totalCategories = await Category.countDocuments({ user: userId });
+    console.log(`[STATS] Itens encontrados: ${totalTransactions} transações, ${totalCategories} categorias.`);
     
     // Get active goals (not completed)
     const activeGoals = await Goal.countDocuments({ 
@@ -154,10 +156,11 @@ const getUserStats = async (req, res) => {
       totalGoals
     };
     
+    console.log(`[STATS] Estatísticas calculadas para ${req.user.id}: Receita (R$ ${stats.totalIncome}), Despesa (R$ ${stats.totalExpenses})`);
     res.json(stats);
   } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
+    console.error(`[STATS] Erro ao calcular estatísticas para o usuário ${req.user.id}:`, err.message);
+    res.status(500).json({ message: 'Server error while calculating stats.', error: err.message });
   }
 };
 
