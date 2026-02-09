@@ -41,4 +41,9 @@ router.delete('/:id', auth, (req, res, next) => {
 // @access  Private
 router.get('/stats/summary', auth, transactionController.getTransactionStats);
 
+// @route   GET /api/transactions/stats/monthly
+// @desc    Get monthly summary (income, expenses, balance, investments)
+// @access  Private
+router.get('/stats/monthly', auth, transactionController.getMonthlySummary);
+
 module.exports = router;

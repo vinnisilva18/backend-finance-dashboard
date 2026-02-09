@@ -311,11 +311,106 @@ const getTransactionStats = async (req, res) => {
   }
 };
 
+// @desc    Get monthly summary (income, expenses, balance, investments)
+// @route   GET /api/transactions/stats/monthly
+// @access  Private
+const getMonthlySummary = async (req, res) => {
+  try {
+    const now = new Date();
+    const monthParam = req.query.month;
+    const yearParam = req.query.year;
+
+    const month = monthParam !== undefined ? parseInt(monthParam, 10) : (now.getMonth() + 1);
+    const year = yearParam !== undefined ? parseInt(yearParam, 10) : now.getFullYear();
+
+    if (Number.isNaN(month) || Number.isNaN(year) || month < 1 || month > 12 || year < 1970) {
+      return res.status(400).json({ message: 'Invalid month or year. Use month=1..12 and a valid year.' });
+    }
+
+    const startDate = new Date(year, month - 1, 1, 0, 0, 0, 0);
+    const endDate = new Date(year, month, 0, 23, 59, 59, 999);
+
+    const matchQuery = {
+      user: new mongoose.Types.ObjectId(req.user.id),
+      date: { $gte: startDate, $lte: endDate }
+    };
+
+    const summary = await Transaction.aggregate([
+      { $match: matchQuery },
+      {
+        $group: {
+          _id: null,
+          totalIncome: {
+            $sum: {
+              $cond: [
+                { $and: [{ $eq: ['$type', 'income'] }, { $ne: ['$isInvestment', true] }] },
+                '$amount',
+                0
+              ]
+            }
+          },
+          totalExpenses: {
+            $sum: {
+              $cond: [
+                { $and: [{ $eq: ['$type', 'expense'] }, { $ne: ['$isInvestment', true] }] },
+                { $abs: '$amount' },
+                0
+              ]
+            }
+          },
+          totalInvestments: {
+            $sum: {
+              $cond: [
+                { $eq: ['$isInvestment', true] },
+                { $ifNull: ['$amountBRL', '$amount'] },
+                0
+              ]
+            }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          totalIncome: 1,
+          totalExpenses: 1,
+          totalInvestments: 1,
+          netBalance: { $subtract: ['$totalIncome', '$totalExpenses'] },
+          netBalanceAfterInvestments: { $subtract: [{ $subtract: ['$totalIncome', '$totalExpenses'] }, '$totalInvestments'] },
+          count: 1
+        }
+      }
+    ]);
+
+    const payload = summary[0] || {
+      totalIncome: 0,
+      totalExpenses: 0,
+      totalInvestments: 0,
+      netBalance: 0,
+      netBalanceAfterInvestments: 0,
+      count: 0
+    };
+
+    res.json({
+      month,
+      year,
+      startDate,
+      endDate,
+      ...payload
+    });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
+  }
+};
+
 module.exports = {
   getTransactions,
   getTransaction,
   createTransaction,
   updateTransaction,
   deleteTransaction,
-  getTransactionStats
+  getTransactionStats,
+  getMonthlySummary
 };
