@@ -7,7 +7,7 @@ const Currency = require('../models/Currency');
 const getCurrencies = async (req, res) => {
   try {
     const currencies = await Currency.find({ user: req.user.id });
-    
+
     // If user has no currencies, create default ones
     if (currencies.length === 0) {
       const defaultCurrencies = [
@@ -17,12 +17,12 @@ const getCurrencies = async (req, res) => {
         { code: 'JPY', name: 'Japanese Yen', symbol: '¥', rate: 110.5, isBase: false, user: req.user.id },
         { code: 'BRL', name: 'Brazilian Real', symbol: 'R$', rate: 5.2, isBase: false, user: req.user.id },
       ];
-      
+
       await Currency.insertMany(defaultCurrencies);
       const updatedCurrencies = await Currency.find({ user: req.user.id });
       return res.json(updatedCurrencies);
     }
-    
+
     res.json(currencies);
   } catch (err) {
     console.error(err.message);
@@ -37,9 +37,9 @@ const updateRates = async (req, res) => {
   try {
     // In a real app, you would fetch from an API like ExchangeRate-API
     // For now, we'll simulate with random updates
-    
+
     const currencies = await Currency.find({ user: req.user.id });
-    
+
     const updatedCurrencies = await Promise.all(
       currencies.map(async (currency) => {
         if (currency.isBase) {
@@ -52,7 +52,7 @@ const updateRates = async (req, res) => {
         return currency.save();
       })
     );
-    
+
     res.json({
       message: 'Exchange rates updated',
       currencies: updatedCurrencies
@@ -69,40 +69,40 @@ const updateRates = async (req, res) => {
 const setBaseCurrency = async (req, res) => {
   try {
     const { code } = req.params;
-    
+
     // Find the currency to set as base
     const newBaseCurrency = await Currency.findOne({
       code,
       user: req.user.id
     });
-    
+
     if (!newBaseCurrency) {
       return res.status(404).json({ message: 'Currency not found' });
     }
-    
+
     // Get current base currency
     const currentBaseCurrency = await Currency.findOne({
       isBase: true,
       user: req.user.id
     });
-    
+
     if (currentBaseCurrency) {
       // Unset current base
       currentBaseCurrency.isBase = false;
       await currentBaseCurrency.save();
     }
-    
+
     // Set new base
     newBaseCurrency.isBase = true;
     newBaseCurrency.rate = 1;
     await newBaseCurrency.save();
-    
+
     // Update all other rates relative to new base
     const otherCurrencies = await Currency.find({
       user: req.user.id,
       _id: { $ne: newBaseCurrency._id }
     });
-    
+
     const updatedCurrencies = await Promise.all(
       otherCurrencies.map(async (currency) => {
         // Convert from old base to new base
@@ -113,9 +113,9 @@ const setBaseCurrency = async (req, res) => {
         return currency.save();
       })
     );
-    
+
     const allCurrencies = await Currency.find({ user: req.user.id });
-    
+
     res.json({
       message: `Base currency set to ${code}`,
       currencies: allCurrencies
@@ -132,25 +132,25 @@ const setBaseCurrency = async (req, res) => {
 const convertCurrency = async (req, res) => {
   try {
     const { amount, fromCurrency, toCurrency } = req.body;
-    
+
     // Get both currencies
     const from = await Currency.findOne({
       code: fromCurrency,
       user: req.user.id
     });
-    
+
     const to = await Currency.findOne({
       code: toCurrency,
       user: req.user.id
     });
-    
+
     if (!from || !to) {
       return res.status(404).json({ message: 'Currency not found' });
     }
-    
+
     // Convert amount
     const convertedAmount = (amount / from.rate) * to.rate;
-    
+
     res.json({
       original: {
         amount,
@@ -174,17 +174,17 @@ const convertCurrency = async (req, res) => {
 const addCurrency = async (req, res) => {
   try {
     const { code, name, symbol, rate } = req.body;
-    
+
     // Check if currency already exists
     const existingCurrency = await Currency.findOne({
       code,
       user: req.user.id
     });
-    
+
     if (existingCurrency) {
       return res.status(400).json({ message: 'Currency already exists' });
     }
-    
+
     const currency = new Currency({
       user: req.user.id,
       code,
@@ -193,10 +193,81 @@ const addCurrency = async (req, res) => {
       rate: rate || 1,
       isBase: false
     });
-    
+
     await currency.save();
-    
+
     res.status(201).json(currency);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
+  }
+};
+
+// @desc    Update currency
+// @route   PUT /api/currencies/:id
+// @access  Private
+const updateCurrency = async (req, res) => {
+  try {
+    const { code, name, symbol, rate } = req.body;
+
+    const currency = await Currency.findOne({
+      _id: req.params.id,
+      user: req.user.id
+    });
+
+    if (!currency) {
+      return res.status(404).json({ message: 'Currency not found' });
+    }
+
+    // Check if updating to a code that already exists (if code is being changed)
+    if (code && code !== currency.code) {
+      const existingCurrency = await Currency.findOne({
+        code,
+        user: req.user.id,
+        _id: { $ne: req.params.id }
+      });
+
+      if (existingCurrency) {
+        return res.status(400).json({ message: 'Currency code already exists' });
+      }
+    }
+
+    currency.code = code || currency.code;
+    currency.name = name || currency.name;
+    currency.symbol = symbol || currency.symbol;
+    currency.rate = rate !== undefined ? rate : currency.rate;
+
+    await currency.save();
+
+    res.json(currency);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
+  }
+};
+
+// @desc    Delete currency
+// @route   DELETE /api/currencies/:id
+// @access  Private
+const deleteCurrency = async (req, res) => {
+  try {
+    const currency = await Currency.findOne({
+      _id: req.params.id,
+      user: req.user.id
+    });
+
+    if (!currency) {
+      return res.status(404).json({ message: 'Currency not found' });
+    }
+
+    // Prevent deleting base currency
+    if (currency.isBase) {
+      return res.status(400).json({ message: 'Cannot delete base currency' });
+    }
+
+    await Currency.findByIdAndDelete(req.params.id);
+
+    res.json({ message: 'Currency deleted' });
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
@@ -208,5 +279,7 @@ module.exports = {
   updateRates,
   setBaseCurrency,
   convertCurrency,
-  addCurrency
+  addCurrency,
+  updateCurrency,
+  deleteCurrency
 };

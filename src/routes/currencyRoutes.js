@@ -28,4 +28,14 @@ router.put('/base/:code', auth, currencyController.setBaseCurrency);
 // @access  Private
 router.post('/convert', auth, currencyController.convertCurrency);
 
+// @route   PUT /api/currencies/:id
+// @desc    Update currency
+// @access  Private
+router.put('/:id', auth, currencyController.updateCurrency);
+
+// @route   DELETE /api/currencies/:id
+// @desc    Delete currency
+// @access  Private
+router.delete('/:id', auth, currencyController.deleteCurrency);
+
 module.exports = router;
