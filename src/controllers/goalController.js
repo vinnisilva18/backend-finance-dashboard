@@ -1,6 +1,30 @@
 const Goal = require('../models/Goal');
 const mongoose = require('mongoose');
 
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+function serializeGoalWithCalculations(goalDoc) {
+  const goal = goalDoc.toObject ? goalDoc.toObject() : goalDoc;
+  const daysRemainingRaw = Math.ceil((new Date(goal.deadline) - new Date()) / MS_PER_DAY);
+  const daysRemaining = daysRemainingRaw > 0 ? daysRemainingRaw : 0;
+
+  const targetAmount = Number(goal.targetAmount || 0);
+  const currentAmount = Number(goal.currentAmount || 0);
+  const amountNeeded = Math.max(0, targetAmount - currentAmount);
+
+  const dailyAmountToSave = daysRemaining > 0 ? amountNeeded / daysRemaining : amountNeeded;
+  const monthlyAmountToSave = daysRemaining > 0 ? amountNeeded / (daysRemaining / 30) : amountNeeded;
+
+  return {
+    ...goal,
+    daysRemaining,
+    amountNeeded,
+    dailyAmountToSave,
+    monthlyAmountToSave,
+    isOverdue: daysRemainingRaw < 0 && !goal.isCompleted
+  };
+}
+
 // @desc    Get all goals
 // @route   GET /api/goals
 // @access  Private
@@ -16,9 +40,9 @@ const getGoals = async (req, res) => {
       query.currentAmount = { $gte: '$targetAmount' };
     }
     
-    const goals = await Goal.find(query).sort({ priority: 1, deadline: 1 });
-    
-    res.json(goals);
+    const goals = await Goal.find(query).populate('category').populate('currency').sort({ priority: 1, deadline: 1 });
+
+    res.json(goals.map(serializeGoalWithCalculations));
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
@@ -33,13 +57,13 @@ const getGoal = async (req, res) => {
     const goal = await Goal.findOne({
       _id: req.params.id,
       user: req.user.id
-    });
-    
+    }).populate('category').populate('currency');
+
     if (!goal) {
       return res.status(404).json({ message: 'Goal not found' });
     }
-    
-    res.json(goal);
+
+    res.json(serializeGoalWithCalculations(goal));
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
@@ -122,7 +146,7 @@ const createGoal = async (req, res) => {
 
     await goal.save();
 
-    res.status(201).json(goal);
+    res.status(201).json(serializeGoalWithCalculations(goal));
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
@@ -193,7 +217,7 @@ const updateGoal = async (req, res) => {
 
     await goal.save();
 
-    res.json(goal);
+    res.json(serializeGoalWithCalculations(goal));
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
@@ -257,7 +281,7 @@ const addContribution = async (req, res) => {
     await goal.save();
     
     res.json({
-      goal,
+      goal: serializeGoalWithCalculations(goal),
       contribution: {
         amount,
         date: date || Date.now(),

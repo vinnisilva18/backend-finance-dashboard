@@ -6,4 +6,5 @@
 - [x] Atualizar goalController.js para aceitar currency em createGoal e updateGoal
 - [x] Atualizar goalRoutes.js para usar middleware de validação em POST e PUT
 - [x] Corrigir validação para aceitar category como string ou ID
+- [x] Adicionar populate('category').populate('currency') às queries do Goal.find em goalController.js
 - [x] Testar criação de goals com currency

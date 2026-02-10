@@ -61,6 +61,7 @@ const goalService = {
                     progress: goal.progress,
                     amountNeeded: goal.amountNeeded,
                     dailyAmountToSave: goal.dailyAmountToSave,
+                    monthlyAmountToSave: goal.monthlyAmountToSave,
                     isOverdue: daysRemaining < 0 && !goal.isCompleted
                 };
             });
@@ -113,6 +114,7 @@ const goalService = {
                 ...goalObj,
                 daysRemaining,
                 dailyAmountToSave: goal.dailyAmountToSave,
+                monthlyAmountToSave: goal.monthlyAmountToSave,
                 progressHistory,
                 relatedTransactions,
                 contributions: contributions.map(t => ({

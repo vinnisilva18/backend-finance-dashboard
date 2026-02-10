@@ -122,6 +122,13 @@ goalSchema.virtual('dailyAmountToSave').get(function() {
     return this.amountNeeded / daysRemaining;
 });
 
+// Virtual for monthly amount to save (based on a 30-day month)
+goalSchema.virtual('monthlyAmountToSave').get(function() {
+    const daysRemaining = this.daysRemaining;
+    if (daysRemaining <= 0) return this.amountNeeded;
+    return this.amountNeeded / (daysRemaining / 30);
+});
+
 // Pre-save hook to check if goal is completed
 goalSchema.pre('save', function(next) {
     if (this.currentAmount >= this.targetAmount && !this.isCompleted) {
