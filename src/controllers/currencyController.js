@@ -15,6 +15,7 @@ const getCurrencies = async (req, res) => {
         { code: 'EUR', name: 'Euro', symbol: '€', rate: 0.85, isBase: false, user: req.user.id },
         { code: 'GBP', name: 'British Pound', symbol: '£', rate: 0.73, isBase: false, user: req.user.id },
         { code: 'JPY', name: 'Japanese Yen', symbol: '¥', rate: 110.5, isBase: false, user: req.user.id },
+        { code: 'BRL', name: 'Brazilian Real', symbol: 'R$', rate: 5.2, isBase: false, user: req.user.id },
       ];
       
       await Currency.insertMany(defaultCurrencies);

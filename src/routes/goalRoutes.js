@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
+const { validateRequest, goalValidation } = require('../middleware/validation');
 const goalController = require('../controllers/goalController');
 
 // @route   GET /api/goals
@@ -16,12 +17,12 @@ router.get('/:id', auth, goalController.getGoal);
 // @route   POST /api/goals
 // @desc    Create goal
 // @access  Private
-router.post('/', auth, goalController.createGoal);
+router.post('/', auth, validateRequest(goalValidation), goalController.createGoal);
 
 // @route   PUT /api/goals/:id
 // @desc    Update goal
 // @access  Private
-router.put('/:id', auth, goalController.updateGoal);
+router.put('/:id', auth, validateRequest(goalValidation), goalController.updateGoal);
 
 // @route   DELETE /api/goals/:id
 // @desc    Delete goal

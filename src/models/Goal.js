@@ -44,6 +44,11 @@ const goalSchema = new mongoose.Schema({
         ref: 'Category',
         default: null
     },
+    currency: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Currency',
+        required: [true, 'Currency is required']
+    },
     isCompleted: {
         type: Boolean,
         default: false

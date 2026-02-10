@@ -53,7 +53,10 @@ const goalValidation = [
     body('targetAmount').isFloat({ min: 0 }).withMessage('Target amount must be a positive number'),
     body('currentAmount').optional().isFloat({ min: 0 }).withMessage('Current amount must be a positive number'),
     body('deadline').isISO8601().withMessage('Invalid date format'),
-    body('color').optional().isHexColor().withMessage('Invalid color format')
+    body('color').optional().isHexColor().withMessage('Invalid color format'),
+    body('currency').isMongoId().withMessage('Invalid currency ID'),
+    body('priority').optional().isIn(['low', 'medium', 'high']).withMessage('Priority must be low, medium, or high'),
+    body('category').optional().isString().trim().isLength({ min: 1 }).withMessage('Category must be a valid name or ID')
 ];
 
 module.exports = {
