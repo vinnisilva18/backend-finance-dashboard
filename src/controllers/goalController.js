@@ -1,7 +1,24 @@
 const Goal = require('../models/Goal');
+const Currency = require('../models/Currency');
 const mongoose = require('mongoose');
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+function pickCurrencySummary(currencyDoc) {
+  if (!currencyDoc || typeof currencyDoc !== 'object') return null;
+
+  const code = currencyDoc.code ? String(currencyDoc.code) : null;
+  if (!code) return null;
+
+  return {
+    id: currencyDoc._id,
+    code,
+    symbol: currencyDoc.symbol || null,
+    name: currencyDoc.name || null,
+    rate: typeof currencyDoc.rate === 'number' ? currencyDoc.rate : Number(currencyDoc.rate || 0) || null,
+    isBase: Boolean(currencyDoc.isBase)
+  };
+}
 
 function serializeGoalWithCalculations(goalDoc) {
   const goal = goalDoc.toObject ? goalDoc.toObject() : goalDoc;
@@ -15,8 +32,13 @@ function serializeGoalWithCalculations(goalDoc) {
   const dailyAmountToSave = daysRemaining > 0 ? amountNeeded / daysRemaining : amountNeeded;
   const monthlyAmountToSave = daysRemaining > 0 ? amountNeeded / (daysRemaining / 30) : amountNeeded;
 
+  const currencySummary = pickCurrencySummary(goal.currency);
+
   return {
     ...goal,
+    currencySummary,
+    currencyCode: currencySummary?.code || null,
+    currencySymbol: currencySummary?.symbol || null,
     daysRemaining,
     amountNeeded,
     dailyAmountToSave,
@@ -146,7 +168,12 @@ const createGoal = async (req, res) => {
 
     await goal.save();
 
-    res.status(201).json(serializeGoalWithCalculations(goal));
+    const populatedGoal = await Goal.findOne({
+      _id: goal._id,
+      user: req.user.id
+    }).populate('category').populate('currency');
+
+    res.status(201).json(serializeGoalWithCalculations(populatedGoal || goal));
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
@@ -217,7 +244,12 @@ const updateGoal = async (req, res) => {
 
     await goal.save();
 
-    res.json(serializeGoalWithCalculations(goal));
+    const populatedGoal = await Goal.findOne({
+      _id: goal._id,
+      user: req.user.id
+    }).populate('category').populate('currency');
+
+    res.json(serializeGoalWithCalculations(populatedGoal || goal));
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');
@@ -253,6 +285,11 @@ const deleteGoal = async (req, res) => {
 const addContribution = async (req, res) => {
   try {
     const { amount, date, notes } = req.body;
+    const contributionAmount = Number(amount);
+
+    if (!Number.isFinite(contributionAmount) || contributionAmount <= 0) {
+      return res.status(400).json({ message: 'Invalid contribution amount' });
+    }
     
     const goal = await Goal.findOne({
       _id: req.params.id,
@@ -264,7 +301,7 @@ const addContribution = async (req, res) => {
     }
     
     // Add contribution
-    goal.currentAmount += amount;
+    goal.currentAmount = Number(goal.currentAmount || 0) + contributionAmount;
     
     // Ensure current amount doesn't exceed target amount
     if (goal.currentAmount > goal.targetAmount) {
@@ -272,18 +309,25 @@ const addContribution = async (req, res) => {
     }
     
     // Add to contributions history
+    goal.contributions = goal.contributions || [];
     goal.contributions.push({
-      amount,
+      amount: contributionAmount,
+      currency: goal.currency || null,
       date: date || Date.now(),
       notes
     });
     
     await goal.save();
+
+    const populatedGoal = await Goal.findOne({
+      _id: goal._id,
+      user: req.user.id
+    }).populate('category').populate('currency');
     
     res.json({
-      goal: serializeGoalWithCalculations(goal),
+      goal: serializeGoalWithCalculations(populatedGoal || goal),
       contribution: {
-        amount,
+        amount: contributionAmount,
         date: date || Date.now(),
         notes
       }
@@ -299,31 +343,86 @@ const addContribution = async (req, res) => {
 // @access  Private
 const getGoalStats = async (req, res) => {
   try {
-    const goals = await Goal.find({ user: req.user.id });
-    
-    const stats = goals.reduce((acc, goal) => {
-      acc.totalTarget += goal.targetAmount;
-      acc.totalCurrent += goal.currentAmount;
-      acc.goalCount++;
-      
-      if (goal.currentAmount >= goal.targetAmount) {
-        acc.completedCount++;
+    const goals = await Goal.find({ user: req.user.id }).populate('currency');
+    const baseCurrencyDoc = await Currency.findOne({ user: req.user.id, isBase: true });
+
+    const baseCurrency = pickCurrencySummary(baseCurrencyDoc?.toObject ? baseCurrencyDoc.toObject() : baseCurrencyDoc);
+    const baseRate = typeof baseCurrency?.rate === 'number' && baseCurrency.rate > 0 ? baseCurrency.rate : 1;
+
+    const byCurrency = goals.reduce((acc, goalDoc) => {
+      const goal = goalDoc.toObject ? goalDoc.toObject() : goalDoc;
+      const currency = pickCurrencySummary(goal.currency);
+      const currencyCode = currency?.code || 'UNKNOWN';
+
+      if (!acc[currencyCode]) {
+        acc[currencyCode] = {
+          currencySummary: currency,
+          totalTarget: 0,
+          totalCurrent: 0,
+          totalProgress: 0,
+          goalCount: 0,
+          completedCount: 0,
+          activeCount: 0
+        };
       }
-      
+
+      acc[currencyCode].totalTarget += Number(goal.targetAmount || 0);
+      acc[currencyCode].totalCurrent += Number(goal.currentAmount || 0);
+      acc[currencyCode].goalCount += 1;
+
+      if (Number(goal.currentAmount || 0) >= Number(goal.targetAmount || 0)) {
+        acc[currencyCode].completedCount += 1;
+      }
+
       return acc;
-    }, {
-      totalTarget: 0,
-      totalCurrent: 0,
-      totalProgress: 0,
-      goalCount: 0,
-      completedCount: 0,
-      activeCount: 0
+    }, {});
+
+    for (const code of Object.keys(byCurrency)) {
+      const entry = byCurrency[code];
+      entry.totalProgress = entry.totalTarget > 0 ? entry.totalCurrent / entry.totalTarget : 0;
+      entry.activeCount = entry.goalCount - entry.completedCount;
+    }
+
+    // Backwards-compatible totals (sum without conversion)
+    const totals = goals.reduce(
+      (acc, goal) => {
+        acc.totalTarget += Number(goal.targetAmount || 0);
+        acc.totalCurrent += Number(goal.currentAmount || 0);
+        acc.goalCount += 1;
+        if (Number(goal.currentAmount || 0) >= Number(goal.targetAmount || 0)) acc.completedCount += 1;
+        return acc;
+      },
+      { totalTarget: 0, totalCurrent: 0, totalProgress: 0, goalCount: 0, completedCount: 0, activeCount: 0 }
+    );
+    totals.totalProgress = totals.totalTarget > 0 ? totals.totalCurrent / totals.totalTarget : 0;
+    totals.activeCount = totals.goalCount - totals.completedCount;
+
+    // Totals converted to base currency (when rates are available)
+    const totalsInBase = goals.reduce(
+      (acc, goalDoc) => {
+        const goal = goalDoc.toObject ? goalDoc.toObject() : goalDoc;
+        const currency = pickCurrencySummary(goal.currency);
+        const rate = typeof currency?.rate === 'number' && currency.rate > 0 ? currency.rate : null;
+        if (!rate) return acc;
+
+        acc.totalTarget += (Number(goal.targetAmount || 0) / rate) * baseRate;
+        acc.totalCurrent += (Number(goal.currentAmount || 0) / rate) * baseRate;
+        acc.goalCount += 1;
+        if (Number(goal.currentAmount || 0) >= Number(goal.targetAmount || 0)) acc.completedCount += 1;
+        return acc;
+      },
+      { totalTarget: 0, totalCurrent: 0, totalProgress: 0, goalCount: 0, completedCount: 0, activeCount: 0 }
+    );
+    totalsInBase.totalProgress =
+      totalsInBase.totalTarget > 0 ? totalsInBase.totalCurrent / totalsInBase.totalTarget : 0;
+    totalsInBase.activeCount = totalsInBase.goalCount - totalsInBase.completedCount;
+
+    res.json({
+      ...totals,
+      baseCurrency,
+      totalsInBase,
+      byCurrency
     });
-    
-    stats.totalProgress = stats.totalTarget > 0 ? stats.totalCurrent / stats.totalTarget : 0;
-    stats.activeCount = stats.goalCount - stats.completedCount;
-    
-    res.json(stats);
   } catch (err) {
     console.error(err.message);
     res.status(500).send('Server error');

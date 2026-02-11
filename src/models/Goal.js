@@ -88,7 +88,28 @@ const goalSchema = new mongoose.Schema({
             enum: ['daily', 'weekly', 'monthly'],
             default: 'weekly'
         }
-    }
+    },
+    contributions: [{
+        amount: {
+            type: Number,
+            required: true,
+            min: [0, 'Contribution amount cannot be negative']
+        },
+        currency: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Currency',
+            default: null
+        },
+        date: {
+            type: Date,
+            default: Date.now
+        },
+        notes: {
+            type: String,
+            trim: true,
+            maxlength: [500, 'Notes cannot exceed 500 characters']
+        }
+    }]
 }, {
     timestamps: true
 });
